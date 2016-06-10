@@ -1,0 +1,46 @@
+{
+  "rules": {
+    "comma-dangle": [
+      2,
+      "always-multiline"
+    ],
+    "quotes": [
+      2,
+      "single"
+    ],
+    "linebreak-style": [
+      2,
+      "unix"
+    ],
+    "semi": [
+      2,
+      "always"
+    ],
+    "strict": [
+      2,
+      "global"
+    ],
+    "no-unused-vars": [
+      2,
+      {
+        "args": "after-used",
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "max-len": [
+      2,
+      120,
+      2,
+      {
+        "ignoreUrls": true,
+        "ignorePattern": "\/(.*)\/;"
+      }
+    ]
+  },
+  "env": {
+    "node": true,
+    "mocha": true,
+    "es6": true
+  },
+  "extends": "eslint:recommended"
+}
