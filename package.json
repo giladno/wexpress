@@ -18,15 +18,12 @@
   "homepage": "https://github.com/giladno/wexpress#readme",
   "dependencies": {
     "bcryptjs": "^2.3.0",
-    "body-parser": "^1.15.1",
+    "bluebird": "^3.4.1",
+    "body-parser": "^1.15.2",
+    "bs58": "^3.0.0",
     "cookie-session": "^2.0.0-alpha.1",
-    "ejs": "^2.4.2",
-    "mongop": "github:giladno/mongop",
-    "morgan": "^1.7.0",
-    "rand-token": "^0.2.1",
-    "require-all": "^2.0.0",
-    "underscore": "^1.8.3",
-    "validator": "^5.4.0",
-    "winston": "^2.2.0"
+    "mongojs": "^2.4.0",
+    "request": "^2.73.0",
+    "require-all": "^2.0.0"
   }
 }
