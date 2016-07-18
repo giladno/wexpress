@@ -10,7 +10,8 @@ const platforms = require('require-all')(require('path').join(__dirname,
     'platforms'));
 
 module.exports = opt=>{
-    assert(opt&&opt.cookie&&opt.cookie.secret, 'missing cookie secret');
+    opt = opt||{};
+    assert(opt.stateless||opt.cookie&&opt.cookie.secret, 'missing cookie secret');
     const db = mongojs(opt.mongo_url||process.env.MONGO_URL||
         'mongodb://127.0.0.1:27017/wexpress');
     const user = db.collection(opt.collection||'user');
@@ -22,19 +23,22 @@ module.exports = opt=>{
     const hash = password=>Promise.promisify(bcrypt.hash)(password, opt.bcrypt||10);
     const compare = (p1, p2)=>Promise.promisify(bcrypt.compare)(p1, p2);
     const app = express();
-    app.use(require('cookie-session')({
-        name: opt.cookie.name||'wexpress',
-        secret: opt.cookie.secret,
-        secureProxy: opt.cookie.secureProxy!==undefined ?
-            opt.cookie.secureProxy : process.env.NODE_ENV=='production',
-        maxAge: opt.cookie.age||30*86400000,
-    }));
+    if (!opt.stateless)
+    {
+        app.use(require('cookie-session')({
+            name: opt.cookie.name||'wexpress',
+            secret: opt.cookie.secret,
+            secureProxy: opt.cookie.secureProxy!==undefined ?
+                opt.cookie.secureProxy : process.env.NODE_ENV=='production',
+            maxAge: opt.cookie.age||30*86400000,
+        }));
+    }
     app.use(require('body-parser').urlencoded({extended: true}));
     if (opt.json)
         app.use(require('body-parser').json());
     app.use(Promise.coroutine(function*(req, res, next){
         try {
-            const token = (opt.stateless&&(req.query.token||req.body.token))||
+            const token = opt.stateless ? req.query.token||req.body.token :
                 req.session.token;
             req.user = token && (yield findOne({token: token})) || null;
             next();
@@ -70,7 +74,8 @@ module.exports = opt=>{
                     return opt.middleware ? next() : res.status(403).end();
                 }
                 req.user = user;
-                req.session.token = user.token.token;
+                if (!opt.stateless)
+                    req.session.token = user.token.token;
                 return opt.middleware ? next() : res.json({token: user.token.token});
             }
             for (let name in platforms)
@@ -101,7 +106,8 @@ module.exports = opt=>{
                     upsert: true,
                 });
                 assert(res.user, 'could not insert new user');
-                req.session.token = req.user.token.token;
+                if (!opt.stateless)
+                    req.session.token = req.user.token.token;
                 return opt.middleware ? next() : res.json({token: req.user.token.token});
             }
             res.status(400).end();
@@ -153,7 +159,8 @@ module.exports = opt=>{
                 yield Promise.method(opt.verify)(req.user);
                 return opt.middleware ? next() : res.status(202).end();
             }
-            req.session.token = req.user.token.token;
+            if (!opt.stateless)
+                req.session.token = req.user.token.token;
             return opt.middleware ? next() : res.json({token: req.user.token.token});
         } catch(err) { next(err); }
     }));
@@ -246,7 +253,8 @@ module.exports = opt=>{
                     }}},
                 });
             }
-            req.session = null;
+            if (!opt.stateless)
+                req.session = null;
             return opt.middleware ? next() : res.status(205).end();
         } catch(err) { next(err); }
     }));
