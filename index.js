@@ -1,4 +1,5 @@
 'use strict';
+const _ = require('lodash');
 const assert = require('assert');
 const Promise = require('bluebird');
 const express = require('express');
@@ -6,12 +7,10 @@ const mongojs = require('mongojs');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const base58 = require('bs58');
-const platforms = require('require-all')(require('path').join(__dirname,
-    'platforms'));
 
 module.exports = opt=>{
     opt = opt||{};
-    assert(opt.stateless||opt.cookie&&opt.cookie.secret, 'missing cookie secret');
+    opt.cookie = opt.cookie||{};
     const db = mongojs(opt.mongo_url||process.env.MONGO_URL||
         'mongodb://127.0.0.1:27017/wexpress');
     const user = db.collection(opt.collection||'user');
@@ -22,15 +21,27 @@ module.exports = opt=>{
         .then(base58.encode);
     const hash = password=>Promise.promisify(bcrypt.hash)(password, opt.bcrypt||10);
     const compare = (p1, p2)=>Promise.promisify(bcrypt.compare)(p1, p2);
+    let platforms = require('require-all')(require('path').join(__dirname,
+        'platforms'));
+    if (Array.isArray(opt.platforms))
+        platforms = _.pick(platforms, opt.platforms);
+    else if (typeof opt.platforms=='object')
+    {
+        platforms = _.pick(platforms,
+            Object.keys(opt.platforms).filter(key=>opt.platforms[key]));
+    }
+    else if (!opt.platforms)
+        platforms = {};
     const app = express();
     if (!opt.stateless)
     {
         app.use(require('cookie-session')({
             name: opt.cookie.name||'wexpress',
-            secret: opt.cookie.secret,
+            secret: opt.cookie.secret||process.env.COOKIE_SECRET||
+                throw new Error('missing cookie secret'),
             secureProxy: opt.cookie.secureProxy!==undefined ?
                 opt.cookie.secureProxy : process.env.NODE_ENV=='production',
-            maxAge: opt.cookie.age||30*86400000,
+            maxAge: opt.cookie.age||365*86400000,
         }));
     }
     app.use(require('body-parser').urlencoded({extended: true}));
@@ -119,8 +130,6 @@ module.exports = opt=>{
                 return res.status(400).end();
             if (opt.username && !req.body.username)
                 return res.status(400).end();
-            const md5 = crypto.createHash('md5').update(req.body.email.trim().toLowerCase())
-                .digest('hex');
             let user = {
                 email: req.body.email,
                 password: yield hash(req.body.password),
@@ -133,9 +142,16 @@ module.exports = opt=>{
                     ua: req.headers['user-agent'],
                     ip: req.ip,
                 },
-                avatar: `https://www.gravatar.com/avatar/${md5}?s=200&d=identicon`,
-                thumbnail: `https://www.gravatar.com/avatar/${md5}?s=50&d=identicon`,
             };
+            if (opt.gravatar)
+            {
+                const md5 = crypto.createHash('md5')
+                    .update(req.body.email.trim().toLowerCase()).digest('hex');
+                Object.assign(user, {
+                    avatar: `https://www.gravatar.com/avatar/${md5}?s=200&d=identicon`,
+                    thumbnail: `https://www.gravatar.com/avatar/${md5}?s=50&d=identicon`,
+                });
+            }
             if (req.body.username)
                 user.username = req.body.username;
             if (opt.verify)
